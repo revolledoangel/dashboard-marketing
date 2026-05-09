@@ -5,12 +5,12 @@
         <div class="container-fluid">
             <div class="row mb-2">
                 <div class="col-sm-6">
-                    <h1 class="m-0">Configuración - Clientes</h1>
+                    <h1 class="m-0"><i class="fas fa-cog"></i> Configuración</h1>
                 </div>
                 <div class="col-sm-6">
                     <ol class="breadcrumb float-sm-right">
                         <li class="breadcrumb-item"><a href="index.php">Inicio</a></li>
-                        <li class="breadcrumb-item active">Clientes</li>
+                        <li class="breadcrumb-item active">Configuración</li>
                     </ol>
                 </div>
             </div>
@@ -20,6 +20,101 @@
     <!-- Main content -->
     <section class="content">
         <div class="container-fluid">
+            
+            <!-- Tabs de configuración -->
+            <ul class="nav nav-tabs mb-3" id="tabsConfiguracion" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="tab-sistema" data-toggle="tab" href="#contenidoSistema" role="tab">
+                        <i class="fas fa-server"></i> Sistema
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="tab-clientes" data-toggle="tab" href="#contenidoClientes" role="tab">
+                        <i class="fas fa-building"></i> Clientes
+                    </a>
+                </li>
+            </ul>
+            
+            <!-- Contenido de tabs -->
+            <div class="tab-content" id="contenidoTabs">
+                
+                <!-- TAB: Configuración del Sistema -->
+                <div class="tab-pane fade show active" id="contenidoSistema" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="card card-info">
+                                <div class="card-header">
+                                    <h3 class="card-title"><i class="fas fa-clock"></i> Zona Horaria</h3>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted">
+                                        <i class="fas fa-info-circle"></i> 
+                                        La zona horaria determina cómo se muestran las fechas y horas en todo el panel.
+                                        Las fechas se guardan en UTC pero se muestran en la zona configurada.
+                                    </p>
+                                    
+                                    <div class="form-group">
+                                        <label for="timezoneSelector">
+                                            <i class="fas fa-globe"></i> Seleccionar Zona Horaria
+                                        </label>
+                                        <select class="form-control" id="timezoneSelector">
+                                            <option value="">Cargando...</option>
+                                        </select>
+                                        <small class="form-text text-muted">
+                                            Zona actual: <strong id="timezoneActual">Cargando...</strong>
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="alert alert-info mt-3">
+                                        <i class="fas fa-calendar-alt"></i> 
+                                        <strong>Hora actual del sistema:</strong><br>
+                                        <span id="horaActual" style="font-size: 1.2rem; font-family: monospace;">--:--:--</span>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <button type="button" class="btn btn-info" id="btnGuardarTimezone">
+                                        <i class="fas fa-save"></i> Guardar Configuración
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <div class="card card-secondary">
+                                <div class="card-header">
+                                    <h3 class="card-title"><i class="fas fa-info-circle"></i> Información UTC</h3>
+                                </div>
+                                <div class="card-body">
+                                    <p>
+                                        <strong>¿Por qué UTC?</strong><br>
+                                        UTC (Tiempo Universal Coordinado) es el estándar mundial para medir el tiempo.
+                                        Todas las fechas se guardan en UTC en la base de datos y luego se convierten
+                                        a tu zona horaria al mostrarse.
+                                    </p>
+                                    
+                                    <p class="mb-0">
+                                        <strong>Ventajas:</strong>
+                                    </p>
+                                    <ul>
+                                        <li>Consistencia entre diferentes usuarios</li>
+                                        <li>No hay problemas con cambios de horario de verano</li>
+                                        <li>Facilita la comparación de eventos globales</li>
+                                        <li>Múltiples usuarios en diferentes zonas ven sus datos correctamente</li>
+                                    </ul>
+                                    
+                                    <div class="alert alert-secondary mb-0">
+                                        <i class="fas fa-clock"></i> 
+                                        <strong>Hora UTC actual:</strong><br>
+                                        <span id="horaUTC" style="font-size: 1.1rem; font-family: monospace;">--:--:--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- TAB: Clientes -->
+                <div class="tab-pane fade" id="contenidoClientes" role="tabpanel">
             
             <div class="row">
                 <!-- Formulario para crear cliente -->
@@ -59,6 +154,8 @@
                     </div>
                 </div>
             </div>
+            
+            </div><!-- Cierre tab-content -->
 
         </div>
     </section>

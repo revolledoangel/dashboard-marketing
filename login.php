@@ -56,12 +56,12 @@
         <div class="card-body">
             <form id="loginForm">
                 <div class="mb-3">
-                    <label for="email" class="form-label">Email</label>
+                    <label for="email" class="form-label">Usuario</label>
                     <div class="input-group">
                         <span class="input-group-text">
-                            <i class="fas fa-envelope"></i>
+                            <i class="fas fa-user"></i>
                         </span>
-                        <input type="email" class="form-control" id="email" name="email" placeholder="admin@admin.com" required autofocus>
+                        <input type="text" class="form-control" id="email" name="email" placeholder="admin" required autofocus>
                     </div>
                 </div>
                 
@@ -72,6 +72,9 @@
                             <i class="fas fa-lock"></i>
                         </span>
                         <input type="password" class="form-control" id="password" name="password" placeholder="••••••••" required>
+                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                            <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                        </button>
                     </div>
                 </div>
                 
@@ -81,12 +84,6 @@
                     </button>
                 </div>
             </form>
-            
-            <div class="mt-3 text-center">
-                <small class="text-muted">
-                    <i class="fas fa-info-circle"></i> Usuario demo: admin@admin.com / password
-                </small>
-            </div>
         </div>
     </div>
 </div>
@@ -144,6 +141,20 @@ $(document).ready(function() {
                 });
             }
         });
+    });
+    
+    // Toggle password visibility
+    $('#togglePassword').on('click', function() {
+        const passwordField = $('#password');
+        const passwordIcon = $('#togglePasswordIcon');
+        
+        if (passwordField.attr('type') === 'password') {
+            passwordField.attr('type', 'text');
+            passwordIcon.removeClass('fa-eye').addClass('fa-eye-slash');
+        } else {
+            passwordField.attr('type', 'password');
+            passwordIcon.removeClass('fa-eye-slash').addClass('fa-eye');
+        }
     });
 });
 </script>

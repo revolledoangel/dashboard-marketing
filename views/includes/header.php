@@ -498,6 +498,136 @@
         body, .main-header, .main-sidebar, .content-wrapper, .card, .form-control, .btn {
             transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
         }
+        
+        /* ============================= */
+        /* DRAG & DROP - SORTABLE STYLES */
+        /* ============================= */
+        
+        .sortable-item {
+            transition: all 0.3s ease;
+        }
+        
+        .sortable-ghost {
+            opacity: 0.4;
+            background: #f8f9fa;
+        }
+        
+        .dark-mode .sortable-ghost {
+            background: #374151;
+        }
+        
+        .sortable-chosen {
+            cursor: grabbing !important;
+        }
+        
+        .sortable-drag {
+            opacity: 0.8;
+            transform: rotate(2deg);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3) !important;
+        }
+        
+        /* Indicador visual de arrastre visitas */
+        .sortable-visita .small-box {
+            cursor: grab;
+            user-select: none;
+        }
+        
+        .sortable-visita .small-box:active {
+            cursor: grabbing;
+        }
+        
+        /* Hover effect visitas */
+        .sortable-visita .small-box:hover {
+            transform: scale(1.01);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .dark-mode .sortable-visita .small-box:hover {
+            box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+        }
+        
+        /* ============================= */
+        /* EVENTOS ANIDADOS */
+        /* ============================= */
+        
+        /* Drop zone para eventos dentro de páginas */
+        .eventos-container {
+            transition: all 0.3s ease;
+            border-radius: 5px;
+        }
+        
+        .eventos-container:empty::after {
+            content: 'Arrastra eventos aquí';
+            display: block;
+            text-align: center;
+            padding: 10px;
+            opacity: 0.5;
+            font-size: 0.85rem;
+        }
+        
+        .sortable-eventos {
+            min-height: 40px;
+        }
+        
+        /* Highlight al arrastrar evento sobre drop zone */
+        .sortable-eventos.sortable-ghost-evento {
+            background: rgba(255,255,255,0.1);
+            border: 2px dashed rgba(255,193,7,0.7);
+        }
+        
+        /* Evento libre (sin asignar) */
+        .sortable-evento {
+            transition: all 0.2s ease;
+        }
+        
+        .sortable-evento .card {
+            cursor: grab;
+        }
+        
+        .sortable-evento .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .sortable-evento .card:active {
+            cursor: grabbing;
+        }
+        
+        /* Evento anidado (dentro de página) */
+        .sortable-evento-anidado {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        
+        .sortable-evento-anidado:hover {
+            transform: translateX(5px);
+        }
+        
+        .sortable-evento-anidado .card {
+            cursor: grab;
+        }
+        
+        .sortable-evento-anidado:active {
+            cursor: grabbing;
+        }
+        
+        /* Ghost para eventos */
+        .sortable-ghost-evento {
+            opacity: 0.3;
+            background: rgba(255,193,7,0.1);
+        }
+        
+        /* Badge tasa de conversión */
+        .badge-conversion {
+            background: rgba(40,167,69,0.2);
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .dark-mode .badge-conversion {
+            background: rgba(34,197,94,0.2);
+            color: #4ade80;
+        }
     </style>
     
     <script>

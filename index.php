@@ -7,6 +7,10 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
+// Configurar timezone del sistema
+require_once __DIR__ . '/includes/timezone_helper.php';
+setTimezoneConfig();
+
 // Determinar qué página mostrar
 $page = $_GET['page'] ?? 'dashboard';
 

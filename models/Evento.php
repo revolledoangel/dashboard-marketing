@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/timezone_helper.php';
 
 class Evento {
     private $pdo;
@@ -9,20 +10,46 @@ class Evento {
         $this->pdo = getDB();
     }
     
-    // Obtener todos los eventos (con filtro opcional por embudo)
-    public function getAll($embudoId = null) {
+    // Obtener todos los eventos (con filtro opcional por embudo y fechas)
+    public function getAll($embudoId = null, $fechaInicio = null, $fechaFin = null) {
+        $sql = "SELECT * FROM eventos WHERE 1=1";
+        $params = [];
+        
         if ($embudoId) {
-            $stmt = $this->pdo->prepare("
-                SELECT * FROM eventos 
-                WHERE embudo_id = :embudo_id 
-                ORDER BY timestamp DESC
-            ");
-            $stmt->execute([':embudo_id' => $embudoId]);
-        } else {
-            $stmt = $this->pdo->query("SELECT * FROM eventos ORDER BY timestamp DESC");
+            $sql .= " AND embudo_id = :embudo_id";
+            $params[':embudo_id'] = $embudoId;
         }
         
-        return $stmt->fetchAll();
+        // Filtrar por fecha (comparar con timestamp en UTC en la BD)
+        if ($fechaInicio) {
+            // Convertir fecha local a UTC para comparar
+            $fechaInicioUTC = convertirLocalAUTC($fechaInicio . ' 00:00:00');
+            $sql .= " AND timestamp >= :fecha_inicio";
+            $params[':fecha_inicio'] = $fechaInicioUTC;
+        }
+        
+        if ($fechaFin) {
+            // Convertir fecha local a UTC (fin del día)
+            $fechaFinUTC = convertirLocalAUTC($fechaFin . ' 23:59:59');
+            $sql .= " AND timestamp <= :fecha_fin";
+            $params[':fecha_fin'] = $fechaFinUTC;
+        }
+        
+        $sql .= " ORDER BY timestamp DESC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        
+        $eventos = $stmt->fetchAll();
+        
+        // Convertir timestamps de UTC a timezone configurado
+        foreach ($eventos as &$evento) {
+            if (isset($evento['timestamp'])) {
+                $evento['timestamp'] = convertirUTCaLocal($evento['timestamp'], 'Y-m-d H:i:s');
+            }
+        }
+        
+        return $eventos;
     }
     
     // Obtener evento por ID
@@ -41,7 +68,7 @@ class Evento {
                 'tipo' => $data['tipo'], // 'visita' o 'evento'
                 'nombre' => $data['nombre'], // 'home', 'click_boton', etc.
                 'url' => $data['url'] ?? '',
-                'timestamp' => date('Y-m-d H:i:s'),
+                'timestamp' => gmdate('Y-m-d H:i:s'), // Guardar en UTC
                 'ip' => $data['ip'] ?? null,
                 'user_agent' => $data['user_agent'] ?? null,
                 'referrer' => $data['referrer'] ?? null,

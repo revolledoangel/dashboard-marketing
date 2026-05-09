@@ -37,11 +37,68 @@
                 <div class="col-md-6">
                     <div class="card" id="botonCodigoGTMContainer" style="display:none;">
                         <div class="card-body">
-                            <label><i class="fas fa-code"></i> Código de Integración</label>
-                            <div>
-                                <button class="btn btn-success btn-block" id="btnVerCodigoGTM">
-                                    <i class="fas fa-code"></i> Ver Código GTM
-                                </button>
+                            <label><i class="fas fa-code"></i> Acciones Rápidas</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <button class="btn btn-success btn-block btn-sm" id="btnVerCodigoGTM">
+                                        <i class="fas fa-code"></i> Ver Código GTM
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <button class="btn btn-primary btn-block btn-sm" id="btnNuevoProducto">
+                                        <i class="fas fa-plus"></i> Producto
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros de Fecha -->
+            <div class="row mb-3" id="filtrosFecha" style="display:none;">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <label><i class="fas fa-calendar-alt"></i> Período</label>
+                                    <div class="btn-group btn-group-sm d-block" role="group">
+                                        <button type="button" class="btn btn-outline-primary filtro-fecha-rapido" data-dias="0">Hoy</button>
+                                        <button type="button" class="btn btn-outline-primary filtro-fecha-rapido" data-dias="7">Últimos 7 días</button>
+                                        <button type="button" class="btn btn-outline-primary filtro-fecha-rapido active" data-dias="30">Últimos 30 días</button>
+                                        <button type="button" class="btn btn-outline-primary filtro-fecha-rapido" data-dias="90">Últimos 90 días</button>
+                                        <button type="button" class="btn btn-outline-primary" id="btnPersonalizarFecha">
+                                            <i class="fas fa-calendar"></i> Personalizar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label>&nbsp;</label>
+                                    <div>
+                                        <button type="button" class="btn btn-primary btn-sm btn-block" id="btnAplicarFiltros">
+                                            <i class="fas fa-sync-alt"></i> Actualizar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Rango personalizado (oculto por defecto) -->
+                            <div class="row mt-3" id="rangoPersonalizado" style="display:none;">
+                                <div class="col-md-5">
+                                    <label for="fechaInicio">Fecha Inicio</label>
+                                    <input type="date" class="form-control form-control-sm" id="fechaInicio">
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="fechaFin">Fecha Fin</label>
+                                    <input type="date" class="form-control form-control-sm" id="fechaFin">
+                                </div>
+                                <div class="col-md-2">
+                                    <label>&nbsp;</label>
+                                    <button type="button" class="btn btn-success btn-sm btn-block" id="btnAplicarPersonalizado">
+                                        <i class="fas fa-check"></i> OK
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -51,69 +108,9 @@
             <!-- Contenedor de métricas -->
             <div id="contenedorMetricas" style="display:none;">
                 
-                <!-- Tarjetas de resumen -->
-                <div class="row">
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-info">
-                            <div class="inner">
-                                <h3 id="totalEventos">0</h3>
-                                <p>Total Eventos</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-signal"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-success">
-                            <div class="inner">
-                                <h3 id="totalVisitas">0</h3>
-                                <p>Visitas</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-eye"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-warning">
-                            <div class="inner">
-                                <h3 id="totalAcciones">0</h3>
-                                <p>Acciones/Eventos</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-mouse-pointer"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-lg-3 col-6">
-                        <div class="small-box bg-danger">
-                            <div class="inner">
-                                <h3 id="conversion">0%</h3>
-                                <p>Tasa de Conversión</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-percentage"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tabla de eventos -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title"><i class="fas fa-list"></i> Eventos Capturados</h3>
-                            </div>
-                            <div class="card-body">
-                                <div id="tablaEventos"></div>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Cards de páginas visitadas -->
+                <div class="row" id="contenedorPaginasVisitadas">
+                    <!-- Cards se generarán dinámicamente aquí -->
                 </div>
 
             </div>
@@ -177,6 +174,50 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Crear Producto -->
+<div class="modal fade" id="modalNuevoProducto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-shopping-cart"></i> Crear Producto
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> <strong>¿Qué es un producto?</strong>
+                    <p class="mb-0 mt-2">
+                        Un producto representa el final del embudo: la compra. Al crearlo se generará un webhook 
+                        único que configurarás en Hotmart para recibir notificaciones de compras aprobadas.
+                    </p>
+                </div>
+                
+                <form id="formNuevoProducto">
+                    <div class="form-group">
+                        <label for="nombreProducto">
+                            <i class="fas fa-tag"></i> Nombre del Producto <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="nombreProducto" name="nombre" 
+                               placeholder="Ej: Curso de Marketing Digital" required>
+                        <small class="form-text text-muted">
+                            Este nombre te ayudará a identificar el producto en el funnel.
+                        </small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarProducto">
+                    <i class="fas fa-save"></i> Crear Producto
+                </button>
             </div>
         </div>
     </div>

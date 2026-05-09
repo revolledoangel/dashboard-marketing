@@ -559,6 +559,14 @@ function inicializarPaginaEmbudos() {
 function inicializarPaginaMetricas() {
     cargarEmbudosEnSelector();
     
+    // Inicializar fechas por defecto (últimos 30 días)
+    const hoy = new Date();
+    const hace30Dias = new Date();
+    hace30Dias.setDate(hoy.getDate() - 30);
+    
+    $('#fechaInicio').val(hace30Dias.toISOString().split('T')[0]);
+    $('#fechaFin').val(hoy.toISOString().split('T')[0]);
+    
     // Detectar si viene un embudo preseleccionado en la URL
     const urlParams = new URLSearchParams(window.location.search);
     const embudoPreseleccionado = urlParams.get('embudo');
@@ -581,6 +589,9 @@ function inicializarPaginaMetricas() {
                 verCodigoGTM(embudoId, tokenEmbudo, nombreEmbudo);
             });
             
+            // Mostrar filtros de fecha
+            $('#filtrosFecha').show();
+            
             cargarMetricasEmbudo(embudoId, nombreEmbudo);
         } else {
             // Si deselecciona, quitar el parámetro de la URL
@@ -592,7 +603,49 @@ function inicializarPaginaMetricas() {
             $('#mensajeSinEmbudo').show();
             $('#breadcrumbEmbudo').hide();
             $('#botonCodigoGTMContainer').hide();
+            $('#filtrosFecha').hide();
         }
+    });
+    
+    // Filtros rápidos de fecha
+    $('.filtro-fecha-rapido').on('click', function() {
+        $('.filtro-fecha-rapido').removeClass('active');
+        $(this).addClass('active');
+        
+        const dias = parseInt($(this).data('dias'));
+        const fechaFin = new Date();
+        const fechaInicio = new Date();
+        
+        if (dias === 0) {
+            // Hoy
+            fechaInicio.setHours(0, 0, 0, 0);
+        } else {
+            fechaInicio.setDate(fechaFin.getDate() - dias);
+        }
+        
+        $('#fechaInicio').val(fechaInicio.toISOString().split('T')[0]);
+        $('#fechaFin').val(fechaFin.toISOString().split('T')[0]);
+        
+        // Ocultar y recargar
+        $('#rangoPersonalizado').hide();
+        aplicarFiltrosFecha();
+    });
+    
+    // Botón personalizar
+    $('#btnPersonalizarFecha').on('click', function() {
+        $('.filtro-fecha-rapido').removeClass('active');
+        $(this).addClass('active');
+        $('#rangoPersonalizado').slideToggle();
+    });
+    
+    // Botón aplicar personalizado
+    $('#btnAplicarPersonalizado').on('click', function() {
+        aplicarFiltrosFecha();
+    });
+    
+    // Botón actualizar
+    $('#btnAplicarFiltros').on('click', function() {
+        aplicarFiltrosFecha();
     });
     
     // Si hay embudo preseleccionado, esperamos a que se carguen los embudos
@@ -601,6 +654,16 @@ function inicializarPaginaMetricas() {
         setTimeout(function() {
             $('#selectorEmbudoMetricas').val(embudoPreseleccionado).trigger('change');
         }, 500);
+    }
+}
+
+// Aplicar filtros de fecha y recargar métricas
+function aplicarFiltrosFecha() {
+    const embudoId = $('#selectorEmbudoMetricas').val();
+    const nombreEmbudo = $('#selectorEmbudoMetricas option:selected').text();
+    
+    if (embudoId) {
+        cargarMetricasEmbudo(embudoId, nombreEmbudo);
     }
 }
 
@@ -632,6 +695,12 @@ function cargarEmbudosEnSelector() {
 function cargarMetricasEmbudo(embudoId, nombreEmbudo) {
     console.log('🔍 Cargando métricas para embudo:', embudoId, nombreEmbudo);
     
+    // Obtener fechas de los filtros
+    const fechaInicio = $('#fechaInicio').val();
+    const fechaFin = $('#fechaFin').val();
+    
+    console.log('📅 Rango de fechas:', fechaInicio, 'a', fechaFin);
+    
     // Actualizar breadcrumb
     $('#breadcrumbEmbudo').text(nombreEmbudo).show();
     
@@ -639,30 +708,277 @@ function cargarMetricasEmbudo(embudoId, nombreEmbudo) {
     $('#mensajeSinEmbudo').hide();
     $('#contenedorMetricas').show();
     
-    // Cargar eventos del embudo
+    // Cargar eventos del embudo con filtro de fechas
     $.ajax({
         url: 'api.php?action=evento&sub=listar',
         method: 'GET',
-        data: { embudo_id: embudoId },
+        data: { 
+            embudo_id: embudoId,
+            fecha_inicio: fechaInicio,
+            fecha_fin: fechaFin
+        },
         dataType: 'json',
         success: function(eventos) {
             console.log('📊 Eventos recibidos:', eventos);
             console.log('📊 Cantidad de eventos:', Array.isArray(eventos) ? eventos.length : Object.keys(eventos).length);
-            actualizarEstadisticas(eventos);
-            mostrarTablaEventos(eventos);
+            mostrarPaginasVisitadas(eventos);
+            
+            // Cargar productos (se mostrarán al final del funnel)
+            cargarProductos(embudoId);
         },
         error: function(xhr, status, error) {
             console.error('❌ Error cargando eventos:', status, error);
             console.error('❌ Respuesta:', xhr.responseText);
-            // Si aún no existe el endpoint, mostrar datos vacíos
-            $('#totalEventos').text('0');
-            $('#totalVisitas').text('0');
-            $('#totalAcciones').text('0');
-            $('#conversion').text('0%');
-            $('#tablaEventos').html('<p class="text-muted text-center">No hay eventos registrados aún</p>');
+            $('#contenedorPaginasVisitadas').html('<div class="col-12"><p class="text-muted text-center">No hay eventos registrados aún</p></div>');
         }
     });
 }
+
+// Mostrar páginas visitadas agrupadas con eventos anidados
+function mostrarPaginasVisitadas(eventos) {
+    const contenedor = $('#contenedorPaginasVisitadas');
+    
+    // Separar visitas y eventos
+    const visitas = eventos.filter(e => e.tipo === 'visita');
+    const eventosAccion = eventos.filter(e => e.tipo === 'evento');
+    
+    if (visitas.length === 0 && eventosAccion.length === 0) {
+        contenedor.html('<div class="col-12"><div class="alert alert-info text-center"><i class="fas fa-info-circle"></i> No hay datos registrados aún</div></div>');
+        return;
+    }
+    
+    // Agrupar visitas por nombre de página
+    const paginasMap = {};
+    visitas.forEach(function(visita) {
+        const nombre = visita.nombre || 'Página sin nombre';
+        if (!paginasMap[nombre]) {
+            paginasMap[nombre] = {
+                tipo: 'visita',
+                nombre: nombre,
+                cantidad: 0,
+                ultimaVisita: visita.timestamp,
+                eventos: []
+            };
+        }
+        paginasMap[nombre].cantidad++;
+        if (visita.timestamp > paginasMap[nombre].ultimaVisita) {
+            paginasMap[nombre].ultimaVisita = visita.timestamp;
+        }
+    });
+    
+    // Agrupar eventos por nombre
+    const eventosMap = {};
+    eventosAccion.forEach(function(evento) {
+        const nombre = evento.nombre || 'Evento sin nombre';
+        if (!eventosMap[nombre]) {
+            eventosMap[nombre] = {
+                tipo: 'evento',
+                nombre: nombre,
+                cantidad: 0
+            };
+        }
+        eventosMap[nombre].cantidad++;
+    });
+    
+    let paginas = Object.values(paginasMap);
+    let eventosLibres = Object.values(eventosMap);
+    
+    // Obtener orden guardado del servidor
+    const embudoId = $('#selectorEmbudoMetricas').val();
+    $.ajax({
+        url: 'api.php?action=orden_funnel&sub=obtener',
+        method: 'GET',
+        data: { embudo_id: embudoId },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success && response.data && response.data.length > 0) {
+                console.log('📥 Estructura guardada recibida:', response.data);
+                // Aplicar estructura guardada
+                const estructura = aplicarEstructuraGuardada(paginas, eventosLibres, response.data);
+                console.log('🎨 Visitas renderizadas en orden:', estructura.visitas.map(v => v.nombre));
+                renderizarEstructuraFunnel(estructura.visitas, estructura.eventosLibres, contenedor);
+            } else {
+                console.log('⚠️ Sin orden guardado, usando orden por cantidad');
+                // Sin orden guardado, ordenar por cantidad
+                paginas.sort((a, b) => b.cantidad - a.cantidad);
+                renderizarEstructuraFunnel(paginas, eventosLibres, contenedor);
+            }
+        },
+        error: function() {
+            // Si falla, ordenar por cantidad
+            paginas.sort((a, b) => b.cantidad - a.cantidad);
+            renderizarEstructuraFunnel(paginas, eventosLibres, contenedor);
+        }
+    });
+}
+
+// Aplicar estructura guardada (visitas con eventos anidados)
+function aplicarEstructuraGuardada(paginas, eventos, estructura) {
+    const paginasMap = {};
+    const eventosMap = {};
+    
+    console.log('🔧 Aplicando estructura guardada...');
+    console.log('   Páginas disponibles:', paginas.map(p => p.nombre));
+    console.log('   Orden guardado:', estructura.map(e => e.nombre));
+    
+    // Crear mapas
+    paginas.forEach(p => paginasMap[p.nombre] = p);
+    eventos.forEach(e => eventosMap[e.nombre] = e);
+    
+    const visitasOrdenadas = [];
+    const eventosLibres = [];
+    
+    // Procesar estructura guardada
+    estructura.forEach((item, index) => {
+        if (item.tipo === 'visita' && paginasMap[item.nombre]) {
+            const pagina = paginasMap[item.nombre];
+            pagina.eventos = [];
+            
+            console.log(`   ✅ Posición ${index + 1}: ${item.nombre}`);
+            
+            // Agregar eventos hijos
+            if (item.eventos && item.eventos.length > 0) {
+                item.eventos.forEach(ev => {
+                    if (eventosMap[ev.nombre]) {
+                        pagina.eventos.push(eventosMap[ev.nombre]);
+                        delete eventosMap[ev.nombre]; // Ya asignado
+                    }
+                });
+            }
+            
+            visitasOrdenadas.push(pagina);
+            delete paginasMap[item.nombre]; // Ya procesado
+        }
+    });
+    
+    // Agregar páginas nuevas no guardadas
+    Object.values(paginasMap).forEach(p => {
+        p.eventos = [];
+        console.log(`   ➕ Nueva página (no guardada): ${p.nombre}`);
+        visitasOrdenadas.push(p);
+    });
+    
+    // Eventos no asignados quedan libres
+    Object.values(eventosMap).forEach(e => eventosLibres.push(e));
+    
+    console.log('🎯 Orden final:', visitasOrdenadas.map(v => v.nombre));
+    
+    return { visitas: visitasOrdenadas, eventosLibres: eventosLibres };
+}
+
+// Renderizar estructura completa del funnel
+function renderizarEstructuraFunnel(visitas, eventosLibres, contenedor) {
+    const colores = ['bg-primary', 'bg-success', 'bg-info', 'bg-warning', 'bg-danger', 'bg-secondary'];
+    
+    let html = '';
+    
+    // Eventos libres (sin asignar a ninguna página)
+    if (eventosLibres.length > 0) {
+        html += '<div class="col-12 mb-2"><h5 class="text-muted" style="font-size: 1rem; margin-bottom: 8px;"><i class="fas fa-bolt"></i> Eventos libres</h5></div>';
+        html += '<div class="row sortable-eventos-libres" style="margin-left: 0; margin-right: 0; margin-bottom: 10px;">';
+        eventosLibres.forEach(function(evento) {
+            html += renderizarCardEvento(evento, null);
+        });
+        html += '</div>';
+        html += '<div class="col-12 mb-2"><hr style="margin: 10px 0;"></div>';
+    }
+    
+    // Visitas con sus eventos
+    const primeraVisitaCantidad = visitas.length > 0 ? visitas[0].cantidad : 0;
+    
+    visitas.forEach(function(pagina, index) {
+        const color = colores[index % colores.length];
+        const esPrimera = index === 0;
+        html += renderizarCardPagina(pagina, color, esPrimera, primeraVisitaCantidad);
+    });
+    
+    contenedor.html(html);
+    
+    // Inicializar drag & drop
+    inicializarDragDropAnidado();
+}
+
+// Renderizar card de página (visita)
+function renderizarCardPagina(pagina, color, esPrimera, primeraVisitaCantidad) {
+    // Calcular tasa de conversión respecto a la primera visita
+    let conversionHTML = '';
+    if (!esPrimera && primeraVisitaCantidad > 0) {
+        const tasaConversion = ((pagina.cantidad / primeraVisitaCantidad) * 100).toFixed(1);
+        conversionHTML = `<small style="font-size: 0.7rem; opacity: 0.85; display: block; margin-top: 3px;">
+            <i class="fas fa-chart-line"></i> ${tasaConversion}% vs 1ra
+        </small>`;
+    }
+    
+    let html = `
+        <div class="col-12 mb-2 sortable-visita" data-tipo="visita" data-nombre="${pagina.nombre}">
+            <div class="small-box ${color}" style="cursor: move; position: relative; padding: 10px 15px; display: flex; align-items: center; min-height: auto;">
+                <div class="inner" style="flex: 0 0 250px; margin: 0; padding-right: 15px;">
+                    <h3 style="font-size: 2rem; margin: 0 0 5px 0;">${pagina.cantidad}</h3>
+                    <p style="margin: 0; font-size: 0.9rem;"><i class="fas fa-grip-vertical"></i> ${pagina.nombre}</p>
+                    <small style="font-size: 0.65rem; opacity: 0.75;">Última: ${pagina.ultimaVisita}</small>
+                    ${conversionHTML}
+                </div>
+                
+                <!-- Drop zone para eventos (vertical a la derecha) -->
+                <div class="eventos-container sortable-eventos" data-pagina="${pagina.nombre}" style="flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-left: 15px; border-left: 2px dashed rgba(255,255,255,0.3); min-height: 60px;">
+    `;
+    
+    // Eventos anidados
+    if (pagina.eventos && pagina.eventos.length > 0) {
+        pagina.eventos.forEach(evento => {
+            html += renderizarCardEventoAnidado(evento, pagina.nombre, pagina.cantidad);
+        });
+    } else {
+        html += `<small style="opacity: 0.5; font-size: 0.75rem;"><i class="fas fa-info-circle"></i> Arrastra eventos aquí</small>`;
+    }
+    
+    html += `
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+// Renderizar card de evento libre (pequeño)
+function renderizarCardEvento(evento, paginaPadre) {
+    return `
+        <div class="col-md-3 col-sm-4 mb-2 sortable-evento" data-tipo="evento" data-nombre="${evento.nombre}">
+            <div class="card card-outline card-warning" style="cursor: grab; margin-bottom: 0;">
+                <div class="card-body p-2" style="padding: 6px 8px !important;">
+                    <i class="fas fa-bolt text-warning" style="font-size: 0.75rem;"></i>
+                    <strong style="font-size: 0.8rem;">${evento.nombre}</strong>
+                    <span class="badge badge-warning float-right" style="font-size: 0.7rem; padding: 2px 6px;">${evento.cantidad}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Renderizar card de evento anidado (dentro de página)
+function renderizarCardEventoAnidado(evento, paginaNombre, totalVisitas) {
+    const tasaConversion = ((evento.cantidad / totalVisitas) * 100).toFixed(1);
+    
+    return `
+        <div class="sortable-evento-anidado" data-tipo="evento" data-nombre="${evento.nombre}" data-pagina="${paginaNombre}" data-cantidad="${evento.cantidad}" style="cursor: grab; flex: 0 0 auto;">
+            <div class="card card-warning" style="margin-bottom: 0; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,193,7,0.5); width: 160px;">
+                <div class="card-body p-2" style="color: #fff; padding: 6px 8px !important;">
+                    <div style="margin-bottom: 3px;">
+                        <i class="fas fa-bolt" style="font-size: 0.75rem;"></i>
+                        <strong style="font-size: 0.8rem;">${evento.nombre}</strong>
+                    </div>
+                    <div>
+                        <span class="badge badge-warning" style="font-size: 0.7rem; padding: 2px 6px;">${evento.cantidad}</span>
+                        <small style="font-size: 0.65rem; opacity: 0.85; margin-left: 4px;">${tasaConversion}%</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Actualizar estadísticas
 
 // Actualizar estadísticas
 function actualizarEstadisticas(eventos) {
@@ -1119,10 +1435,690 @@ function reinitMermaid(isDark) {
         // Re-renderizar diagrama si existe
         const diagramaFlujo = document.getElementById('diagramaFlujo');
         if (diagramaFlujo && diagramaFlujo.innerHTML.includes('mermaid')) {
-            // Actualizar diagrama de flujo si estÃ¡ visible
+            // Actualizar diagrama de flujo si está visible
             if (typeof actualizarDiagramaFlujo === 'function') {
                 actualizarDiagramaFlujo();
             }
         }
     }
 }
+
+// =============================================
+// DRAG & DROP PARA ORDENAR FUNNEL
+// =============================================
+
+// Inicializar drag & drop anidado para funnel
+function inicializarDragDropAnidado() {
+    const contenedor = document.getElementById('contenedorPaginasVisitadas');
+    
+    if (!contenedor) {
+        console.log('⚠️ Contenedor de páginas no encontrado');
+        return;
+    }
+    
+    // Sortable para visitas (páginas principales)
+    Sortable.create(contenedor, {
+        group: {
+            name: 'visitas',
+            pull: false,
+            put: false
+        },
+        animation: 150,
+        filter: '.sortable-eventos-libres',
+        handle: '.small-box',
+        draggable: '.sortable-visita',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        onMove: function(evt) {
+            // Prevenir que las visitas caigan en drop zones de eventos
+            return !evt.to.classList.contains('sortable-eventos');
+        },
+        onEnd: function(evt) {
+            console.log('🔄 Visita movida de posición', evt.oldIndex, '→', evt.newIndex);
+            guardarEstructuraFunnel();
+        }
+    });
+    
+    // Sortable para contenedor de eventos libres
+    const contenedorEventosLibres = document.querySelector('.sortable-eventos-libres');
+    if (contenedorEventosLibres) {
+        Sortable.create(contenedorEventosLibres, {
+            group: {
+                name: 'eventos',
+                pull: true,  // Permitir mover (no clonar)
+                put: true    // Permitir que eventos regresen aquí
+            },
+            animation: 150,
+            draggable: '.sortable-evento, .sortable-evento-anidado',
+            ghostClass: 'sortable-ghost-evento',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            sort: false,
+            onAdd: function(evt) {
+                // Cuando un evento anidado regresa a la zona libre
+                const eventoElement = evt.item;
+                if (eventoElement.classList.contains('sortable-evento-anidado')) {
+                    convertirEventoAnidadoALibre(eventoElement);
+                    guardarEstructuraFunnel();
+                }
+            }
+        });
+    }
+    
+    // Sortable para drop zones de eventos dentro de páginas
+    const dropZones = document.querySelectorAll('.sortable-eventos');
+    dropZones.forEach(zona => {
+        Sortable.create(zona, {
+            group: {
+                name: 'eventos',
+                pull: true,
+                put: function(to, from, dragEl) {
+                    // Solo aceptar eventos, NO visitas
+                    return dragEl.classList.contains('sortable-evento') || 
+                           dragEl.classList.contains('sortable-evento-anidado');
+                }
+            },
+            animation: 150,
+            draggable: '.sortable-evento-anidado,.sortable-evento',
+            ghostClass: 'sortable-ghost-evento',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            onMove: function(evt) {
+                // Solo permitir mover si es un evento
+                return evt.dragged.classList.contains('sortable-evento') || 
+                       evt.dragged.classList.contains('sortable-evento-anidado');
+            },
+            onAdd: function(evt) {
+                // Cuando se agrega un evento a una página
+                const eventoElement = evt.item;
+                const paginaNombre = zona.getAttribute('data-pagina');
+                
+                console.log('🎯 onAdd disparado:', eventoElement.getAttribute('data-nombre'), '→', paginaNombre);
+                
+                // Validar que sea un evento
+                if (!eventoElement.classList.contains('sortable-evento') && 
+                    !eventoElement.classList.contains('sortable-evento-anidado')) {
+                    console.error('❌ Solo se pueden arrastrar eventos aquí');
+                    evt.item.remove();
+                    return;
+                }
+                
+                // Si es un evento libre que se convierte en anidado
+                if (eventoElement.classList.contains('sortable-evento')) {
+                    convertirEventoLibreAAnidado(eventoElement, paginaNombre, zona);
+                } else if (eventoElement.classList.contains('sortable-evento-anidado')) {
+                    // Es un evento que ya estaba anidado y se movió a otra visita
+                    recalcularConversion(eventoElement, paginaNombre);
+                }
+                
+                guardarEstructuraFunnel();
+            },
+            onRemove: function(evt) {
+                // Cuando se remueve un evento de esta zona
+                const zona = evt.from;
+                
+                // Si no quedan eventos, mostrar el mensaje placeholder
+                const eventosRestantes = zona.querySelectorAll('.sortable-evento-anidado');
+                if (eventosRestantes.length === 0 && !zona.querySelector('small')) {
+                    zona.innerHTML = '<small style="opacity: 0.5; font-size: 0.75rem;"><i class="fas fa-info-circle"></i> Arrastra eventos aquí</small>';
+                }
+                
+                guardarEstructuraFunnel();
+            },
+            onUpdate: function(evt) {
+                guardarEstructuraFunnel();
+            }
+        });
+    });
+    
+    console.log('✅ Drag & Drop anidado inicializado');
+}
+
+// Convertir evento libre en evento anidado con tasa de conversión
+function convertirEventoLibreAAnidado(eventoElement, paginaNombre, zona) {
+    const nombreEvento = eventoElement.getAttribute('data-nombre');
+    const cantidadElement = eventoElement.querySelector('.badge');
+    const cantidad = cantidadElement ? parseInt(cantidadElement.textContent) : 0;
+    
+    console.log('🔄 Convirtiendo evento libre:', nombreEvento, 'a', paginaNombre);
+    
+    // Obtener total de visitas de la página
+    const paginaCard = zona.closest('.sortable-visita');
+    const totalVisitasElement = paginaCard ? paginaCard.querySelector('h3') : null;
+    const totalVisitas = totalVisitasElement ? parseInt(totalVisitasElement.textContent) : 1;
+    
+    console.log('   Total visitas de', paginaNombre, ':', totalVisitas);
+    console.log('   Eventos:', cantidad);
+    
+    // Calcular tasa de conversión
+    const tasaConversion = ((cantidad / totalVisitas) * 100).toFixed(1);
+    
+    console.log('   Tasa de conversión:', tasaConversion + '%');
+    
+    // Reemplazar HTML del elemento con formato horizontal compacto
+    eventoElement.className = 'sortable-evento-anidado';
+    eventoElement.setAttribute('data-tipo', 'evento');
+    eventoElement.setAttribute('data-nombre', nombreEvento);
+    eventoElement.setAttribute('data-pagina', paginaNombre);
+    eventoElement.setAttribute('data-cantidad', cantidad);
+    eventoElement.setAttribute('style', 'cursor: grab; flex: 0 0 auto;');
+    eventoElement.innerHTML = `
+        <div class="card card-warning" style="margin-bottom: 0; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,193,7,0.5); width: 160px;">
+            <div class="card-body p-2" style="color: #fff; padding: 6px 8px !important;">
+                <div style="margin-bottom: 3px;">
+                    <i class="fas fa-bolt" style="font-size: 0.75rem;"></i>
+                    <strong style="font-size: 0.8rem;">${nombreEvento}</strong>
+                </div>
+                <div>
+                    <span class="badge badge-warning" style="font-size: 0.7rem; padding: 2px 6px;">${cantidad}</span>
+                    <small style="font-size: 0.65rem; opacity: 0.85; margin-left: 4px;">${tasaConversion}%</small>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Eliminar el mensaje de "Arrastra eventos aquí" si existe
+    const mensajeVacio = zona.querySelector('small');
+    if (mensajeVacio && mensajeVacio.textContent.includes('Arrastra')) {
+        mensajeVacio.remove();
+    }
+    
+    console.log('✅ Evento convertido a anidado');
+}
+
+// Recalcular tasa de conversión de un evento anidado
+function recalcularConversion(eventoElement, nuevaPaginaNombre) {
+    const cantidad = parseInt(eventoElement.getAttribute('data-cantidad')) || 0;
+    
+    console.log('📊 Recalculando conversión para', eventoElement.getAttribute('data-nombre'), 'en', nuevaPaginaNombre);
+    
+    // Obtener total de visitas de la nueva página
+    const zona = eventoElement.closest('.sortable-eventos');
+    const paginaCard = zona ? zona.closest('.sortable-visita') : null;
+    const totalVisitasElement = paginaCard ? paginaCard.querySelector('h3') : null;
+    const totalVisitas = totalVisitasElement ? parseInt(totalVisitasElement.textContent) : 1;
+    
+    // Calcular nueva tasa de conversión
+    const tasaConversion = ((cantidad / totalVisitas) * 100).toFixed(1);
+    
+    console.log('   Nueva tasa de conversión:', tasaConversion + '%');
+    
+    // Actualizar el HTML solo del small de conversión (nuevo formato compacto)
+    const smallElement = eventoElement.querySelector('small');
+    if (smallElement) {
+        smallElement.textContent = tasaConversion + '%';
+    }
+    
+    // Actualizar atributo data-pagina
+    eventoElement.setAttribute('data-pagina', nuevaPaginaNombre);
+}
+
+// Convertir evento anidado de vuelta a evento libre
+function convertirEventoAnidadoALibre(eventoElement) {
+    const nombreEvento = eventoElement.getAttribute('data-nombre');
+    const cantidad = parseInt(eventoElement.getAttribute('data-cantidad')) || 0;
+    
+    console.log('🔙 Convirtiendo evento anidado a libre:', nombreEvento);
+    
+    // Cambiar clases y estructura a formato libre
+    eventoElement.className = 'col-md-3 col-sm-4 mb-2 sortable-evento';
+    eventoElement.removeAttribute('data-pagina');
+    eventoElement.removeAttribute('data-cantidad');
+    eventoElement.setAttribute('data-tipo', 'evento');
+    eventoElement.setAttribute('style', '');
+    
+    eventoElement.innerHTML = `
+        <div class="card card-outline card-warning" style="cursor: grab; margin-bottom: 0;">
+            <div class="card-body p-2" style="padding: 6px 8px !important;">
+                <i class="fas fa-bolt text-warning" style="font-size: 0.75rem;"></i>
+                <strong style="font-size: 0.8rem;">${nombreEvento}</strong>
+                <span class="badge badge-warning float-right" style="font-size: 0.7rem; padding: 2px 6px;">${cantidad}</span>
+            </div>
+        </div>
+    `;
+    
+    console.log('✅ Evento convertido a libre');
+}
+
+// Nueva función para guardar estructura anidada
+function guardarEstructuraFunnel() {
+    const embudoId = $('#selectorEmbudoMetricas').val();
+    
+    if (!embudoId) {
+        console.error('❌ No hay embudo seleccionado');
+        return;
+    }
+    
+    // Construir estructura con visitas y eventos anidados
+    const estructura = [];
+    const contenedorPrincipal = document.getElementById('contenedorPaginasVisitadas');
+    const visitas = contenedorPrincipal.querySelectorAll('.sortable-visita');
+    
+    console.log('🔍 Total visitas encontradas:', visitas.length);
+    
+    visitas.forEach((visita, index) => {
+        const nombrePagina = visita.getAttribute('data-nombre');
+        const dropZone = visita.querySelector('.sortable-eventos');
+        
+        console.log(`📍 Visita #${index + 1}: ${nombrePagina}`);
+        
+        const item = {
+            tipo: 'visita',
+            nombre: nombrePagina,
+            eventos: []
+        };
+        
+        // Obtener eventos anidados
+        if (dropZone) {
+            const eventosAnidados = dropZone.querySelectorAll('.sortable-evento-anidado');
+            eventosAnidados.forEach(evento => {
+                const nombreEvento = evento.getAttribute('data-nombre');
+                console.log(`  └─ Evento: ${nombreEvento}`);
+                item.eventos.push({
+                    tipo: 'evento',
+                    nombre: nombreEvento
+                });
+            });
+        }
+        
+        estructura.push(item);
+    });
+    
+    console.log('💾 Guardando estructura:', estructura);
+    
+    // Enviar al servidor
+    $.ajax({
+        url: 'api.php?action=orden_funnel&sub=guardar',
+        method: 'POST',
+        data: {
+            embudo_id: embudoId,
+            estructura: JSON.stringify(estructura)
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                console.log('✅ Estructura guardada correctamente');
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Orden guardado',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            } else {
+                console.error('❌ Error guardando orden:', response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error AJAX:', error);
+        }
+    });
+}
+
+// =============================================
+// CONFIGURACIÓN - TIMEZONE
+// =============================================
+
+// Al cargar la página de configuración
+$(document).ready(function() {
+    if (window.location.href.includes('page=configuracion')) {
+        cargarConfiguracionTimezone();
+        iniciarRelojTiempoReal();
+    }
+});
+
+// Cargar configuración de timezone
+function cargarConfiguracionTimezone() {
+    // Cargar timezone actual
+    $.ajax({
+        url: 'api.php?action=configuracion&sub=obtener&clave=timezone',
+        method: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            if (response.success && response.data) {
+                const timezoneActual = response.data.valor;
+                $('#timezoneActual').text(timezoneActual);
+                cargarListaTimezones(timezoneActual);
+            }
+        },
+        error: function() {
+            console.error('Error cargando timezone');
+            cargarListaTimezones('Europe/Madrid');
+        }
+    });
+}
+
+// Cargar lista de timezones disponibles
+function cargarListaTimezones(timezoneSeleccionado) {
+    const timezones = {
+        'Europe/Madrid': 'Europa/Madrid (UTC+1/+2)',
+        'America/New_York': 'América/Nueva York (UTC-5/-4)',
+        'America/Los_Angeles': 'América/Los Ángeles (UTC-8/-7)',
+        'America/Chicago': 'América/Chicago (UTC-6/-5)',
+        'America/Denver': 'América/Denver (UTC-7/-6)',
+        'America/Mexico_City': 'América/Ciudad de México (UTC-6/-5)',
+        'America/Bogota': 'América/Bogotá (UTC-5)',
+        'America/Lima': 'América/Lima (UTC-5)',
+        'America/Santiago': 'América/Santiago (UTC-3/-4)',
+        'America/Argentina/Buenos_Aires': 'América/Buenos Aires (UTC-3)',
+        'Europe/London': 'Europa/Londres (UTC+0/+1)',
+        'Europe/Paris': 'Europa/París (UTC+1/+2)',
+        'Europe/Berlin': 'Europa/Berlín (UTC+1/+2)',
+        'Europe/Rome': 'Europa/Roma (UTC+1/+2)',
+        'Asia/Dubai': 'Asia/Dubái (UTC+4)',
+        'Asia/Tokyo': 'Asia/Tokio (UTC+9)',
+        'Asia/Shanghai': 'Asia/Shanghái (UTC+8)',
+        'Australia/Sydney': 'Oceanía/Sídney (UTC+10/+11)',
+        'UTC': 'UTC (Tiempo Universal Coordinado)'
+    };
+    
+    let html = '';
+    for (let tz in timezones) {
+        const selected = tz === timezoneSeleccionado ? 'selected' : '';
+        html += '<option value="' + tz + '" ' + selected + '>' + timezones[tz] + '</option>';
+    }
+    
+    $('#timezoneSelector').html(html);
+}
+
+// Guardar timezone
+$('#btnGuardarTimezone').on('click', function() {
+    const timezone = $('#timezoneSelector').val();
+    
+    if (!timezone) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Zona horaria requerida',
+            text: 'Selecciona una zona horaria'
+        });
+        return;
+    }
+    
+    $.ajax({
+        url: 'api.php?action=configuracion&sub=guardar',
+        method: 'POST',
+        data: {
+            clave: 'timezone',
+            valor: timezone,
+            descripcion: 'Zona horaria para mostrar fechas en el panel'
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                $('#timezoneActual').text(timezone);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Configuración guardada',
+                    text: 'La zona horaria se ha actualizado correctamente. Recarga la página para ver los cambios.',
+                    confirmButtonText: 'Recargar ahora'
+                }).then(function(result) {
+                    if (result.isConfirmed) {
+                        location.reload();
+                    }
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message || 'No se pudo guardar la configuración'
+                });
+            }
+        },
+        error: function() {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error al comunicarse con el servidor'
+            });
+        }
+    });
+});
+
+// Iniciar reloj en tiempo real
+function iniciarRelojTiempoReal() {
+    actualizarRelojes();
+    setInterval(actualizarRelojes, 1000);
+}
+
+function actualizarRelojes() {
+    const ahora = new Date();
+    
+    // Hora UTC
+    const horaUTC = ahora.toISOString().substring(11, 19);
+    $('#horaUTC').text(horaUTC + ' UTC');
+    
+    // Hora local del navegador (aprox. a la zona configurada)
+    const horaLocal = ahora.toLocaleTimeString('es-ES', { hour12: false });
+    $('#horaActual').text(horaLocal);
+}
+
+// ========================================
+// FUNCIONES DE PRODUCTOS
+// ========================================
+
+// Abrir modal de nuevo producto
+$(document).on('click', '#btnNuevoProducto', function() {
+    const embudoId = $('#selectorEmbudoMetricas').val();
+    if (!embudoId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Selecciona un embudo',
+            text: 'Primero debes seleccionar un embudo'
+        });
+        return;
+    }
+    
+    // Limpiar form y abrir modal
+    $('#formNuevoProducto')[0].reset();
+    $('#modalNuevoProducto').modal('show');
+});
+
+// Guardar nuevo producto
+$(document).on('click', '#btnGuardarProducto', function() {
+    const embudoId = $('#selectorEmbudoMetricas').val();
+    const nombre = $('#nombreProducto').val().trim();
+    
+    if (!nombre) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Campo requerido',
+            text: 'Ingresa el nombre del producto'
+        });
+        return;
+    }
+    
+    // Mostrar loading
+    Swal.fire({
+        title: 'Creando producto...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    $.ajax({
+        url: 'api.php?action=producto&sub=crear',
+        method: 'POST',
+        data: {
+            embudo_id: embudoId,
+            nombre: nombre
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                $('#modalNuevoProducto').modal('hide');
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Producto creado',
+                    text: 'El producto se creó correctamente',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                
+                // Recargar productos
+                cargarProductos(embudoId);
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.error || 'No se pudo crear el producto'
+                });
+            }
+        },
+        error: function() {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error al comunicarse con el servidor'
+            });
+        }
+    });
+});
+
+// Cargar productos de un embudo
+function cargarProductos(embudoId) {
+    const fechaInicio = $('#fechaInicio').val();
+    const fechaFin = $('#fechaFin').val();
+    
+    $.ajax({
+        url: 'api.php?action=producto&sub=listar',
+        method: 'GET',
+        data: { 
+            embudo_id: embudoId,
+            fecha_inicio: fechaInicio,
+            fecha_fin: fechaFin
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                mostrarProductos(response.data);
+            }
+        },
+        error: function() {
+            console.error('Error cargando productos');
+        }
+    });
+}
+
+// Mostrar productos como cards
+function mostrarProductos(productos) {
+    const contenedor = $('#contenedorPaginasVisitadas');
+    
+    if (!productos || productos.length === 0) {
+        return; // No hay productos, no mostrar nada
+    }
+    
+    // Agregar productos al final del funnel
+    productos.forEach(function(producto) {
+        const webhookUrl = window.location.origin + '/api.php?action=producto&sub=webhook&token=' + producto.webhook_token;
+        const stats = producto.stats || { total_ventas: 0, conversiones_por_pagina: [] };
+        
+        // Generar HTML de conversiones por página
+        let conversionesHtml = '';
+        if (stats.conversiones_por_pagina && stats.conversiones_por_pagina.length > 0) {
+            stats.conversiones_por_pagina.forEach(conv => {
+                conversionesHtml += `
+                    <div style="margin-right: 20px; font-size: 12px;">
+                        <strong style="color: #155724;">${conv.porcentaje}%</strong> 
+                        <span style="color: #155724;">de ${conv.pagina}</span>
+                    </div>
+                `;
+            });
+        } else {
+            conversionesHtml = '<div style="font-size: 12px; color: #155724;">Sin conversiones aún</div>';
+        }
+        
+        const card = `
+            <div class="col-12 mb-2 producto-card" data-producto-id="${producto.id}">
+                <div class="card border-success" style="border-width: 2px;">
+                    <div class="card-body p-3" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);">
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;">
+                            <!-- Icono y nombre del producto -->
+                            <div style="display: flex; align-items: center; gap: 15px; flex: 0 0 250px;">
+                                <div style="font-size: 36px; color: #28a745;">
+                                    <i class="fas fa-shopping-cart"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1" style="color: #155724; font-weight: 600;">
+                                        ${producto.nombre}
+                                    </h5>
+                                    <small style="color: #155724;">
+                                        <i class="fas fa-box-open"></i> Producto / Compra
+                                    </small>
+                                    <div style="margin-top: 8px;">
+                                        <span style="background: #28a745; color: white; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: 600;">
+                                            <i class="fas fa-dollar-sign"></i> ${stats.total_ventas} compras
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Conversiones por página -->
+                            <div style="flex: 1; min-width: 0;">
+                                <label style="font-size: 11px; color: #155724; margin-bottom: 5px; display: block;">
+                                    <i class="fas fa-percentage"></i> Conversiones:
+                                </label>
+                                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                                    ${conversionesHtml}
+                                </div>
+                            </div>
+                            
+                            <!-- Webhook URL -->
+                            <div style="flex: 1; min-width: 250px;">
+                                <label style="font-size: 11px; color: #155724; margin-bottom: 3px;">
+                                    <i class="fas fa-link"></i> Webhook URL (Configurar en Hotmart):
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" value="${webhookUrl}" 
+                                           readonly style="font-family: monospace; font-size: 11px;">
+                                    <div class="input-group-append">
+                                        <button class="btn btn-success btn-sm" onclick="copiarWebhook('${webhookUrl}', '${producto.nombre}')">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        contenedor.append(card);
+    });
+}
+
+// Copiar webhook al portapapeles
+window.copiarWebhook = function(url, nombreProducto) {
+    navigator.clipboard.writeText(url).then(function() {
+        Swal.fire({
+            icon: 'success',
+            title: 'URL copiada',
+            text: 'Webhook de "' + nombreProducto + '" copiado al portapapeles',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+        });
+    }).catch(function() {
+        // Fallback para navegadores antiguos
+        const input = document.createElement('input');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        
+        Swal.fire({
+            icon: 'success',
+            title: 'URL copiada',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+        });
+    });
+};

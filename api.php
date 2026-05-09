@@ -134,6 +134,81 @@ elseif ($action === 'evento') {
             break;
     }
 }
+// Rutas de productos
+elseif ($action === 'producto') {
+    require_once 'controllers/ProductoController.php';
+    $controller = new ProductoController();
+    $sub = $_GET['sub'] ?? '';
+    
+    switch ($sub) {
+        case 'listar':
+            $controller->listar();
+            break;
+            
+        case 'crear':
+            $controller->crear();
+            break;
+            
+        case 'actualizar_orden':
+            $controller->actualizarOrden();
+            break;
+            
+        case 'eliminar':
+            $controller->eliminar();
+            break;
+            
+        case 'webhook':
+            $controller->webhook();
+            break;
+            
+        default:
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Sub-acción no válida']);
+            break;
+    }
+}
+// Rutas de orden del funnel
+elseif ($action === 'orden_funnel') {
+    require_once 'controllers/OrdenFunnelController.php';
+    $controller = new OrdenFunnelController();
+    $sub = $_GET['sub'] ?? '';
+    
+    switch ($sub) {
+        case 'guardar':
+            $controller->guardar();
+            break;
+            
+        case 'obtener':
+            $controller->obtener();
+            break;
+            
+        default:
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Sub-acción no válida']);
+            break;
+    }
+}
+// Rutas de configuración
+elseif ($action === 'configuracion') {
+    require_once 'controllers/ConfiguracionController.php';
+    $controller = new ConfiguracionController();
+    $sub = $_GET['sub'] ?? '';
+    
+    switch ($sub) {
+        case 'obtener':
+            $controller->obtener();
+            break;
+            
+        case 'guardar':
+            $controller->guardar();
+            break;
+            
+        default:
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Sub-acción no válida']);
+            break;
+    }
+}
 else {
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => 'Acción no válida']);
